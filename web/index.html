@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>TASA EGSE 航電遙測與太空環境干擾模擬台</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0b1120;
+      color: #38bdf8;
+      margin: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h2 { margin: 2px 0; color: #f8fafc; font-size: 18px; }
+    #status { color: #4ade80; font-size: 12px; margin-bottom: 8px; }
+    
+    .control-panel {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .btn {
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #0284c7; color: #ffffff; }
+    .btn-danger { border-color: #f43f5e; color: #f43f5e; }
+    .btn-danger:hover { background: #f43f5e; color: #ffffff; }
+    .btn-active { background: #eab308; color: #0b1120; border-color: #eab308; }
+    .btn-success { border-color: #22c55e; color: #22c55e; }
+    .btn-success:hover { background: #22c55e; color: #0b1120; }
+
+    /* 太空環境干擾注入區 */
+    .disturbance-deck {
+      width: 1000px;
+      background: #111c44;
+      border: 1px solid #e11d48;
+      border-radius: 6px;
+      padding: 8px 15px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-sizing: border-box;
+      font-size: 12px;
+    }
+    .dist-title {
+      font-weight: bold;
+      color: #fda4af;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .toggle-group {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      color: #f1f5f9;
+    }
+    .toggle-group label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    /* 指向目標控制區 */
+    .adcs-deck {
+      width: 1000px;
+      background: #1e293b;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      padding: 8px 15px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-sizing: border-box;
+    }
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #e2e8f0;
+    }
+    .slider-group input[type=range] { width: 70px; accent-color: #38bdf8; }
+    .target-val { display: inline-block; width: 34px; color: #38bdf8; font-weight: bold; text-align: right; }
+
+    .cards-grid {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      width: 1000px;
+      justify-content: space-between;
+    }
+    .card {
+      background: #1e293b;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      flex: 1;
+      text-align: center;
+    }
+    .card .title { font-size: 11px; color: #94a3b8; }
+    .card .val { font-size: 18px; color: #38bdf8; font-weight: bold; margin-top: 3px; }
+    .card .sub { font-size: 10px; color: #cbd5e1; margin-top: 2px; }
+
+    .main-grid {
+      display: flex;
+      gap: 15px;
+      width: 1000px;
+      height: 380px;
+    }
+    .panel {
+      flex: 1;
+      background: #1e293b;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      position: relative;
+      overflow: hidden;
+    }
+    .panel-header {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      font-size: 11px;
+      color: #94a3b8;
+      z-index: 10;
+    }
+    #chart-container {
+      padding: 30px 10px 10px 10px;
+      height: calc(100% - 40px);
+    }
+  </style>
+</head>
+<body>
+  <h2>EGSE Ground Station Telemetry System</h2>
+  <div id="status">正在連線至 WebSocket 遙測串流...</div>
+
+  <div class="control-panel">
+    <button class="btn" id="toggleBtn" onclick="toggleStream()">PAUSE STREAM</button>
+    <button class="btn btn-danger" onclick="clearData()">CLEAR DATA</button>
+  </div>
+
+  <!-- 太空環境干擾注入面板 (Space Environmental Disturbance Injection) -->
+  <div class="disturbance-deck">
+    <div class="dist-title">🌪️ 太空環境干擾力矩注入:</div>
+    <div class="toggle-group">
+      <label><input type="checkbox" id="distAero" checked> 大氣稀薄阻力矩 (LEO Drag)</label>
+      <label><input type="checkbox" id="distGravity" checked> 重力梯度拉直矩 (Gravity Gradient)</label>
+      <label><input type="checkbox" id="distSolar" checked> 太陽光輻射壓 (Solar Radiation)</label>
+      <label><input type="checkbox" id="enableRWSat"> 反應輪飽和限制 (Wheel Saturation)</label>
+    </div>
+  </div>
+
+  <!-- 姿態目標設定 -->
+  <div class="adcs-deck">
+    <div style="display:flex; gap:6px;">
+      <button class="btn btn-success" onclick="setMode('nadir')">對地指向</button>
+      <button class="btn btn-success" onclick="setMode('sun')">太陽指向</button>
+    </div>
+    <div class="slider-group">
+      <span>目標 Pitch:</span>
+      <input type="range" id="tPitch" min="-45" max="45" value="0" oninput="updateSetpointsFromUI()">
+      <span class="target-val" id="tPitchVal">0°</span>
+    </div>
+    <div class="slider-group">
+      <span>目標 Roll:</span>
+      <input type="range" id="tRoll" min="-45" max="45" value="0" oninput="updateSetpointsFromUI()">
+      <span class="target-val" id="tRollVal">0°</span>
+    </div>
+    <div class="slider-group">
+      <span>目標 Yaw:</span>
+      <input type="range" id="tYaw" min="0" max="360" value="0" oninput="updateSetpointsFromUI()">
+      <span class="target-val" id="tYawVal">0°</span>
+    </div>
+  </div>
+
+  <!-- 數據卡片（新增反作用力矩與干擾力矩監控） -->
+  <div class="cards-grid">
+    <div class="card"><div class="title">封包編號</div><div class="val" id="pkt">-</div></div>
+    <div class="card"><div class="title">即時 俯仰 PITCH</div><div class="val" id="pitch">-</div></div>
+    <div class="card"><div class="title">即時 滾轉 ROLL</div><div class="val" id="roll">-</div></div>
+    <div class="card"><div class="title">即時 偏航 YAW</div><div class="val" id="yaw">-</div></div>
+    <div class="card">
+      <div class="title">反應輪馬達輸出 / 飽和度</div>
+      <div class="val" id="torqueVal" style="color:#f59e0b;">0%</div>
+      <div class="sub" id="satStatus">狀態: 正常動態平衡</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel" id="three-container">
+      <div class="panel-header">3D 衛星即時姿態（紫: 衛星本體 / 青: 目標姿態導引）</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">姿態追蹤與干擾力矩動態波形 (實線: 實際 / 虛線: 目標)</div>
+      <div id="chart-container">
+        <canvas id="telemetryChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let isPaused = false;
+    let ws = null;
+
+    let target = { pitch: 0, roll: 0, yaw: 0 };
+    let current = { pitch: 0, roll: 0, yaw: 0 };
+    let velocity = { pitch: 0, roll: 0, yaw: 0 };
+
+    // --- 1. Three.js ---
+    const container = document.getElementById('three-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f172a);
+
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.set(0, 0, 7);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    const satellite = new THREE.Group();
+    const bodyGeo = new THREE.BoxGeometry(1.6, 1.2, 1.2);
+    const bodyMat = new THREE.MeshPhongMaterial({ color: 0xc084fc, flatShading: true });
+    satellite.add(new THREE.Mesh(bodyGeo, bodyMat));
+
+    const panelGeo = new THREE.BoxGeometry(1.8, 0.05, 0.8);
+    const panelMat = new THREE.MeshPhongMaterial({ color: 0x38bdf8, shininess: 80 });
+    const leftPanel = new THREE.Mesh(panelGeo, panelMat);
+    leftPanel.position.set(-1.8, 0, 0);
+    const rightPanel = new THREE.Mesh(panelGeo, panelMat);
+    rightPanel.position.set(1.8, 0, 0);
+    satellite.add(leftPanel);
+    satellite.add(rightPanel);
+    satellite.add(new THREE.AxesHelper(2));
+    scene.add(satellite);
+
+    const ghostSatellite = new THREE.Group();
+    const ghostMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.3 });
+    ghostSatellite.add(new THREE.Mesh(bodyGeo, ghostMat));
+    const gLeft = new THREE.Mesh(panelGeo, ghostMat); gLeft.position.set(-1.8, 0, 0);
+    const gRight = new THREE.Mesh(panelGeo, ghostMat); gRight.position.set(1.8, 0, 0);
+    ghostSatellite.add(gLeft); ghostSatellite.add(gRight);
+    scene.add(ghostSatellite);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    // --- 2. Chart.js ---
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const maxPoints = 50;
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Array(maxPoints).fill(''),
+        datasets: [
+          { label: '實際 Pitch (°)', borderColor: '#38bdf8', data: Array(maxPoints).fill(0), borderWidth: 2, tension: 0.2, pointRadius: 0 },
+          { label: '目標 Pitch (°)', borderColor: '#38bdf8', borderDash: [5, 5], data: Array(maxPoints).fill(0), borderWidth: 1.5, pointRadius: 0 },
+          { label: '實際 Roll (°)', borderColor: '#f43f5e', data: Array(maxPoints).fill(0), borderWidth: 2, tension: 0.2, pointRadius: 0 },
+          { label: '目標 Roll (°)', borderColor: '#f43f5e', borderDash: [5, 5], data: Array(maxPoints).fill(0), borderWidth: 1.5, pointRadius: 0 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+          x: { display: false },
+          y: { min: -50, max: 50, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+        },
+        plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 10 } } } }
+      }
+    });
+
+    // --- 3. 太空環境干擾與反應輪閉迴路演算法 ---
+    let simTime = 0;
+    function updatePhysics() {
+      simTime += 0.02;
+
+      // 讀取干擾項勾選開關
+      const useAero = document.getElementById('distAero').checked;
+      const useGravity = document.getElementById('distGravity').checked;
+      const useSolar = document.getElementById('distSolar').checked;
+      const limitRWSat = document.getElementById('enableRWSat').checked;
+
+      // 計算四大干擾力矩
+      let tauDist = { pitch: 0, roll: 0, yaw: 0 };
+
+      if (useAero) {
+        // 大氣殘留阻力矩：質心偏差產生的穩定偏轉力矩 + 隨機湍流微風
+        tauDist.pitch += 0.015 + (Math.sin(simTime * 2) * 0.005);
+        tauDist.yaw   += 0.012;
+      }
+      if (useGravity) {
+        // 重力梯度力矩：與地心偏角成正比的拉直力矩
+        tauDist.pitch -= 0.03 * Math.sin(current.pitch * (Math.PI / 180));
+        tauDist.roll  -= 0.03 * Math.sin(current.roll * (Math.PI / 180));
+      }
+      if (useSolar) {
+        // 太陽光壓：依光照方向產生持續性力矩
+        tauDist.roll += 0.008;
+      }
+
+      // 控制器增益
+      const Kp = 0.05;
+      const Kd = 0.85;
+      let totalControlTorque = 0;
+
+      ['pitch', 'roll', 'yaw'].forEach(axis => {
+        let err = target[axis] - current[axis];
+        if (axis === 'yaw') {
+          if (err > 180) err -= 360;
+          if (err < -180) err += 360;
+        }
+
+        // 反應輪輸出反作用力矩
+        let ctrlTorque = err * Kp;
+
+        // 若啟用反應輪飽和限制：輸出上限截斷在 0.02 以內
+        if (limitRWSat) {
+          ctrlTorque = Math.max(-0.02, Math.min(0.02, ctrlTorque));
+        }
+
+        totalControlTorque += Math.abs(ctrlTorque);
+
+        // 合成總力矩：控制力矩 + 太空環境干擾力矩
+        const totalTorque = ctrlTorque + tauDist[axis];
+
+        // 數值積分求出角速度與角位移
+        velocity[axis] = (velocity[axis] + totalTorque) * Kd;
+        current[axis] += velocity[axis];
+      });
+
+      // 監控反應輪負荷率
+      const saturationPercent = Math.min(100, (totalControlTorque / 0.08) * 100).toFixed(0);
+      const torqueEl = document.getElementById('torqueVal');
+      const satEl = document.getElementById('satStatus');
+      torqueEl.innerText = `${saturationPercent}%`;
+
+      if (limitRWSat && saturationPercent >= 95) {
+        torqueEl.style.color = '#ef4444';
+        satEl.innerText = '⚠️ 馬達輪轉速飽和！無法抵消干擾！';
+        satEl.style.color = '#ef4444';
+      } else {
+        torqueEl.style.color = '#f59e0b';
+        satEl.innerText = '狀態: 動態平衡對抗中';
+        satEl.style.color = '#cbd5e1';
+      }
+
+      ghostSatellite.rotation.x = target.pitch * (Math.PI / 180);
+      ghostSatellite.rotation.z = -target.roll * (Math.PI / 180);
+      ghostSatellite.rotation.y = target.yaw * (Math.PI / 180);
+
+      if (isPaused || !ws) {
+        satellite.rotation.x = current.pitch * (Math.PI / 180);
+        satellite.rotation.z = -current.roll * (Math.PI / 180);
+        satellite.rotation.y = current.yaw * (Math.PI / 180);
+
+        document.getElementById('pitch').innerText = current.pitch.toFixed(1);
+        document.getElementById('roll').innerText = current.roll.toFixed(1);
+        document.getElementById('yaw').innerText = current.yaw.toFixed(1);
+
+        chart.data.datasets[0].data.push(current.pitch);
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[1].data.push(target.pitch);
+        chart.data.datasets[1].data.shift();
+        chart.data.datasets[2].data.push(current.roll);
+        chart.data.datasets[2].data.shift();
+        chart.data.datasets[3].data.push(target.roll);
+        chart.data.datasets[3].data.shift();
+        chart.update();
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updatePhysics();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // --- 4. WebSocket ---
+    function connectWS() {
+      if (ws !== null) ws.close();
+      ws = new WebSocket(`ws://${window.location.hostname}:8765`);
+
+      ws.onopen = () => {
+        document.getElementById('status').innerText = 'LINK ESTABLISHED - 50Hz STREAM ACTIVE';
+        document.getElementById('status').style.color = '#4ade80';
+      };
+
+      ws.onclose = () => {
+        if (!isPaused) {
+          document.getElementById('status').innerText = 'LINK DOWN (使用本地物理引擎)';
+          document.getElementById('status').style.color = '#f87171';
+        }
+      };
+
+      ws.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        document.getElementById('pkt').innerText = d.id;
+        document.getElementById('pitch').innerText = d.pitch.toFixed(1);
+        document.getElementById('roll').innerText = d.roll.toFixed(1);
+        document.getElementById('yaw').innerText = d.yaw.toFixed(1);
+
+        satellite.rotation.x = d.pitch * (Math.PI / 180);
+        satellite.rotation.z = -d.roll * (Math.PI / 180);
+        satellite.rotation.y = d.yaw * (Math.PI / 180);
+
+        chart.data.datasets[0].data.push(d.pitch);
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[1].data.push(target.pitch);
+        chart.data.datasets[1].data.shift();
+        chart.data.datasets[2].data.push(d.roll);
+        chart.data.datasets[2].data.shift();
+        chart.data.datasets[3].data.push(target.roll);
+        chart.data.datasets[3].data.shift();
+        chart.update();
+      };
+    }
+
+    // --- 5. UI 與交互邏輯 ---
+    function updateSetpointsFromUI() {
+      target.pitch = parseFloat(document.getElementById('tPitch').value);
+      target.roll = parseFloat(document.getElementById('tRoll').value);
+      target.yaw = parseFloat(document.getElementById('tYaw').value);
+      syncTargetToUI();
+    }
+
+    function syncTargetToUI() {
+      document.getElementById('tPitch').value = target.pitch;
+      document.getElementById('tRoll').value = target.roll;
+      document.getElementById('tYaw').value = target.yaw;
+      document.getElementById('tPitchVal').innerText = target.pitch.toFixed(0) + '°';
+      document.getElementById('tRollVal').innerText = target.roll.toFixed(0) + '°';
+      document.getElementById('tYawVal').innerText = target.yaw.toFixed(0) + '°';
+    }
+
+    function setMode(mode) {
+      if (mode === 'nadir') target = { pitch: 0, roll: 0, yaw: 0 };
+      else if (mode === 'sun') target = { pitch: 25, roll: -15, yaw: 90 };
+      syncTargetToUI();
+    }
+
+    function toggleStream() {
+      isPaused = !isPaused;
+      const btn = document.getElementById('toggleBtn');
+      const status = document.getElementById('status');
+
+      if (isPaused) {
+        if (ws) { ws.close(); ws = null; }
+        btn.innerText = 'RESUME STREAM';
+        btn.classList.add('btn-active');
+        status.innerText = 'STREAM PAUSED - 開啟太空環境干擾與 ADCS 閉迴路操控';
+        status.style.color = '#eab308';
+      } else {
+        btn.innerText = 'PAUSE STREAM';
+        btn.classList.remove('btn-active');
+        status.innerText = 'RECONNECTING STREAM...';
+        status.style.color = '#38bdf8';
+        connectWS();
+      }
+    }
+
+    function clearData() {
+      chart.data.datasets.forEach(ds => ds.data = Array(maxPoints).fill(0));
+      chart.update();
+      setMode('nadir');
+    }
+
+    connectWS();
+  </script>
+</body>
+</html>

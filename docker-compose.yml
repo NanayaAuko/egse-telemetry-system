@@ -1,0 +1,23 @@
+services:
+  telemetry-parser:
+    build: ./parser
+    container_name: egse-parser
+    network_mode: host
+    restart: always
+
+  telemetry-sim:
+    build: ./sim
+    container_name: egse-sim
+    network_mode: host
+    depends_on:
+      - telemetry-parser
+    restart: always
+
+  telemetry-web:
+    image: nginx:alpine
+    container_name: egse-web
+    network_mode: host
+    volumes:
+      - ./web/index.html:/usr/share/nginx/html/index.html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: always
