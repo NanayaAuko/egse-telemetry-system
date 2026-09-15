@@ -1,7 +1,7 @@
 # 航電地面支援設備 (EGSE) 遙測監控與姿態控制系統
 ### Avionics EGSE Telemetry Monitoring & ADCS Verification System
 
-這是一套整合嵌入式通訊、低延遲高效能解包、即時軌態動態模擬與 WebGL 數位孿生視覺化的航電地面支援驗證系統（Electrical Ground Support Equipment）。
+這是一套整合嵌入式通訊、低延遲高效能解包、即時軌道態動態模擬器與 WebGL 數位孿生視覺化的航電地面支援驗證系統（Electrical Ground Support Equipment）。
 
 ---
 
