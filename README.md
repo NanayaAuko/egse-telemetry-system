@@ -1,7 +1,7 @@
 # 航電地面支援設備 (EGSE) 遙測監控與姿態控制系統
 ### Avionics EGSE Telemetry Monitoring & ADCS Verification System
 
-一套整合嵌入式通訊、低延遲高效能解包、即時軌態動態模擬與 WebGL 數位孿生視覺化的航電地面支援驗證系統（Electrical Ground Support Equipment）。
+這是一套整合嵌入式通訊、低延遲高效能解包、即時軌態動態模擬與 WebGL 數位孿生視覺化的航電地面支援驗證系統（Electrical Ground Support Equipment）。
 
 ---
 
@@ -14,9 +14,9 @@
 
 ---
 
-## 四大架構核心優勢 (Core Architectural Pillars)
+## 四大架構
 
-* **極致低延遲 (Ultra-low Latency)**：捨棄傳統文字反序列化中介層，數據到達即刻供控制迴路與視覺化模組消費，時延壓至微秒等級。
+* **低延遲 (Ultra-low Latency)**：捨棄傳統文字反序列化中介層，數據到達即刻供控制迴路與視覺化模組消費，時延壓至微秒等級。
 * **零開銷記憶體管理 (Zero-copy & Zero Memory Overhead)**：採用 C/C++ 二進位結構對齊與記憶體映射（Memory-mapped Struct Casting），杜絕傳統字串解析（如 JSON）導致的動態記憶體分配（`malloc`/`new`）與記憶體碎片化。
 * **資料完整性與正確性 (Deterministic Data Integrity)**：實作 ICD 通訊協定校驗（CRC Checksum）與狀態位元旗標（Status Bit-flags）遮罩，保證在高速傳輸下無封包錯位或資料污染。
 * **穩定控制方向 (Stable Closed-Loop Control)**：借鑑無人機（Drone）成熟的 PID 姿態回授控制架構，轉換至微重力角動量守恆環境，動態消除角速度殘留，避免姿態震盪與漂移。
